@@ -1,0 +1,69 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1756298727325,
+      "tag": "0000_happy_ogun",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1756359631387,
+      "tag": "0001_flimsy_nuke",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1756369837590,
+      "tag": "0002_vengeful_rhino",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1756704832016,
+      "tag": "0003_flaky_wither",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1756813999008,
+      "tag": "0004_greedy_hydra",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1757311551247,
+      "tag": "0005_greedy_carmella_unuscione",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1757489966163,
+      "tag": "0006_furry_rattler",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1757660289516,
+      "tag": "0007_lethal_randall_flagg",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1761215721851,
+      "tag": "0008_good_klaw",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,452 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model analytics {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id         String?   @db.VarChar
+  date               DateTime  @db.Timestamp(6)
+  messages_sent      Int?      @default(0)
+  messages_delivered Int?      @default(0)
+  messages_read      Int?      @default(0)
+  messages_replied   Int?      @default(0)
+  new_contacts       Int?      @default(0)
+  active_campaigns   Int?      @default(0)
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model api_logs {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id      String?   @db.VarChar
+  request_type    String    @db.VarChar(50)
+  endpoint        String
+  method          String    @db.VarChar(10)
+  request_body    Json?
+  response_status Int?
+  response_body   Json?
+  duration        Int?
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  channels        channels? @relation(fields: [channel_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "api_logs_channel_id_channels_id_fk")
+}
+
+model automation_edges {
+  id             String      @id @db.VarChar
+  automation_id  String      @db.VarChar
+  source_node_id String      @db.VarChar
+  target_node_id String      @db.VarChar
+  animated       Boolean?    @default(false)
+  created_at     DateTime?   @default(now()) @db.Timestamp(6)
+  updated_at     DateTime?   @default(now()) @db.Timestamp(6)
+  automations    automations @relation(fields: [automation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "automation_edges_automation_id_automations_id_fk")
+
+  @@unique([automation_id, source_node_id, target_node_id], map: "automation_edges_unique_idx")
+}
+
+model automation_execution_logs {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  execution_id String    @db.VarChar
+  node_id      String    @db.VarChar
+  node_type    String
+  status       String
+  input        Json?     @default("{}")
+  output       Json?     @default("{}")
+  error        String?
+  executed_at  DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([execution_id], map: "automation_execution_logs_execution_idx")
+}
+
+model automation_executions {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  automation_id   String         @db.VarChar
+  contact_id      String?        @db.VarChar
+  conversation_id String?        @db.VarChar
+  trigger_data    Json?          @default("{}")
+  status          String
+  current_node_id String?        @db.VarChar
+  execution_path  Json?          @default("[]")
+  variables       Json?          @default("{}")
+  error           String?
+  started_at      DateTime?      @default(now()) @db.Timestamp(6)
+  completed_at    DateTime?      @db.Timestamp(6)
+  result          String?
+  automations     automations    @relation(fields: [automation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "automation_executions_automation_id_automations_id_fk")
+  contacts        contacts?      @relation(fields: [contact_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "automation_executions_contact_id_contacts_id_fk")
+  conversations   conversations? @relation(fields: [conversation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "automation_executions_conversation_id_conversations_id_fk")
+
+  @@index([automation_id], map: "automation_executions_automation_idx")
+  @@index([status])
+}
+
+model automation_nodes {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  automation_id String      @db.VarChar
+  node_id       String      @db.VarChar
+  type          String
+  subtype       String?
+  position      Json?       @default("{}")
+  data          Json?       @default("{}")
+  connections   Json?       @default("[]")
+  created_at    DateTime?   @default(now()) @db.Timestamp(6)
+  updated_at    DateTime?   @default(now()) @db.Timestamp(6)
+  measured      Json?       @default("{}")
+  automations   automations @relation(fields: [automation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "automation_nodes_automation_id_automations_id_fk")
+
+  @@unique([automation_id, node_id], map: "automation_nodes_unique_idx")
+  @@index([automation_id], map: "automation_nodes_automation_idx")
+}
+
+model automations {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id            String?                 @db.VarChar
+  name                  String
+  description           String?
+  trigger               String
+  trigger_config        Json?                   @default("{}")
+  status                String?                 @default("inactive")
+  execution_count       Int?                    @default(0)
+  last_executed_at      DateTime?               @db.Timestamp(6)
+  created_by            String?                 @db.VarChar
+  created_at            DateTime?               @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?               @default(now()) @db.Timestamp(6)
+  automation_edges      automation_edges[]
+  automation_executions automation_executions[]
+  automation_nodes      automation_nodes[]
+  channels              channels?               @relation(fields: [channel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "automations_channel_id_channels_id_fk")
+  users                 users?                  @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "automations_created_by_users_id_fk")
+
+  @@index([channel_id], map: "automations_channel_idx")
+  @@index([status])
+}
+
+model campaign_recipients {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  campaign_id         String    @db.VarChar
+  contact_id          String?   @db.VarChar
+  phone               String
+  name                String?
+  status              String?   @default("pending")
+  whatsapp_message_id String?   @db.VarChar
+  template_params     Json?     @default("{}")
+  sent_at             DateTime? @db.Timestamp(6)
+  delivered_at        DateTime? @db.Timestamp(6)
+  read_at             DateTime? @db.Timestamp(6)
+  error_code          String?   @db.VarChar
+  error_message       String?
+  retry_count         Int?      @default(0)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  campaigns           campaigns @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "campaign_recipients_campaign_id_campaigns_id_fk")
+  contacts            contacts? @relation(fields: [contact_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "campaign_recipients_contact_id_contacts_id_fk")
+
+  @@unique([campaign_id, phone], map: "campaign_phone_unique")
+  @@index([campaign_id], map: "recipients_campaign_idx")
+  @@index([phone], map: "recipients_phone_idx")
+  @@index([status], map: "recipients_status_idx")
+}
+
+model campaigns {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id          String?               @db.VarChar
+  name                String
+  description         String?
+  campaign_type       String
+  type                String
+  api_type            String
+  template_id         String?               @db.VarChar
+  template_name       String?
+  template_language   String?
+  variable_mapping    Json?                 @default("{}")
+  contact_groups      Json?                 @default("[]")
+  csv_data            Json?                 @default("[]")
+  api_key             String?               @db.VarChar
+  api_endpoint        String?
+  status              String?               @default("draft")
+  scheduled_at        DateTime?             @db.Timestamp(6)
+  recipient_count     Int?                  @default(0)
+  sent_count          Int?                  @default(0)
+  delivered_count     Int?                  @default(0)
+  read_count          Int?                  @default(0)
+  replied_count       Int?                  @default(0)
+  failed_count        Int?                  @default(0)
+  completed_at        DateTime?             @db.Timestamp(6)
+  created_at          DateTime?             @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamp(6)
+  campaign_recipients campaign_recipients[]
+  channels            channels?             @relation(fields: [channel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "campaigns_channel_id_channels_id_fk")
+  templates           templates?            @relation(fields: [template_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "campaigns_template_id_templates_id_fk")
+  message_queue       message_queue[]
+  messages            messages[]
+
+  @@index([channel_id], map: "campaigns_channel_idx")
+  @@index([created_at], map: "campaigns_created_idx")
+  @@index([status])
+}
+
+model channels {
+  id                           String          @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  name                         String
+  phone_number_id              String
+  access_token                 String
+  whatsapp_business_account_id String?
+  phone_number                 String?
+  is_active                    Boolean?        @default(true)
+  health_status                String?         @default("unknown")
+  last_health_check            DateTime?       @db.Timestamp(6)
+  health_details               Json?           @default("{}")
+  created_at                   DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at                   DateTime?       @default(now()) @db.Timestamp(6)
+  api_logs                     api_logs[]
+  automations                  automations[]
+  campaigns                    campaigns[]
+  contacts                     contacts[]
+  conversations                conversations[]
+  templates                    templates[]
+}
+
+model contacts {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id            String?                 @db.VarChar
+  name                  String
+  phone                 String
+  email                 String?
+  groups                Json?                   @default("[]")
+  tags                  Json?                   @default("[]")
+  status                String?                 @default("active")
+  last_contact          DateTime?               @db.Timestamp(6)
+  created_at            DateTime?               @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?               @default(now()) @db.Timestamp(6)
+  automation_executions automation_executions[]
+  campaign_recipients   campaign_recipients[]
+  channels              channels?               @relation(fields: [channel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contacts_channel_id_channels_id_fk")
+  conversations         conversations[]
+
+  @@unique([channel_id, phone], map: "contacts_channel_phone_unique")
+  @@index([channel_id], map: "contacts_channel_idx")
+  @@index([phone])
+  @@index([status])
+}
+
+model conversation_assignments {
+  id                                                String        @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  conversation_id                                   String        @db.VarChar
+  user_id                                           String        @db.VarChar
+  assigned_by                                       String?       @db.VarChar
+  assigned_at                                       DateTime?     @default(now()) @db.Timestamp(6)
+  status                                            String        @default("active")
+  priority                                          String?       @default("normal")
+  notes                                             String?
+  resolved_at                                       DateTime?     @db.Timestamp(6)
+  created_at                                        DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at                                        DateTime?     @default(now()) @db.Timestamp(6)
+  users_conversation_assignments_assigned_byTousers users?        @relation("conversation_assignments_assigned_byTousers", fields: [assigned_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "conversation_assignments_assigned_by_users_id_fk")
+  conversations                                     conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "conversation_assignments_conversation_id_conversations_id_fk")
+  users_conversation_assignments_user_idTousers     users         @relation("conversation_assignments_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "conversation_assignments_user_id_users_id_fk")
+}
+
+model conversations {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id               String?                    @db.VarChar
+  contact_id               String?                    @db.VarChar
+  assigned_to              String?                    @db.VarChar
+  contact_phone            String?                    @db.VarChar
+  contact_name             String?                    @db.VarChar
+  status                   String?                    @default("open")
+  priority                 String?                    @default("normal")
+  tags                     Json?                      @default("[]")
+  unread_count             Int?                       @default(0)
+  last_message_at          DateTime?                  @db.Timestamp(6)
+  last_message_text        String?
+  created_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  automation_executions    automation_executions[]
+  conversation_assignments conversation_assignments[]
+  channels                 channels?                  @relation(fields: [channel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "conversations_channel_id_channels_id_fk")
+  contacts                 contacts?                  @relation(fields: [contact_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "conversations_contact_id_contacts_id_fk")
+  messages                 messages[]
+
+  @@index([channel_id], map: "conversations_channel_idx")
+  @@index([contact_id], map: "conversations_contact_idx")
+  @@index([contact_phone], map: "conversations_phone_idx")
+  @@index([status])
+}
+
+model message_queue {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  campaign_id         String?            @db.VarChar
+  channel_id          String?            @db.VarChar
+  recipient_phone     String             @db.VarChar(20)
+  template_name       String?            @db.VarChar(100)
+  template_params     Json?              @default("[]")
+  message_type        String             @db.VarChar(20)
+  status              String?            @default("queued") @db.VarChar(20)
+  attempts            Int?               @default(0)
+  whatsapp_message_id String?            @db.VarChar(100)
+  conversation_id     String?            @db.VarChar(100)
+  sent_via            String?            @db.VarChar(20)
+  cost                String?            @db.VarChar(20)
+  error_code          String?            @db.VarChar(50)
+  error_message       String?
+  scheduled_for       DateTime?          @db.Timestamp(6)
+  processed_at        DateTime?          @db.Timestamp(6)
+  delivered_at        DateTime?          @db.Timestamp(6)
+  read_at             DateTime?          @db.Timestamp(6)
+  created_at          DateTime?          @default(now()) @db.Timestamp(6)
+  campaigns           campaigns?         @relation(fields: [campaign_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "message_queue_campaign_id_campaigns_id_fk")
+  whatsapp_channels   whatsapp_channels? @relation(fields: [channel_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "message_queue_channel_id_whatsapp_channels_id_fk")
+}
+
+model messages {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  conversation_id     String?        @db.VarChar
+  whatsapp_message_id String?        @db.VarChar
+  from_user           Boolean?       @default(false)
+  direction           String?        @default("outbound") @db.VarChar
+  content             String
+  type                String?        @default("text")
+  message_type        String?        @db.VarChar
+  status              String?        @default("sent")
+  timestamp           DateTime?      @db.Timestamp(6)
+  metadata            Json?          @default("{}")
+  delivered_at        DateTime?      @db.Timestamp(6)
+  read_at             DateTime?      @db.Timestamp(6)
+  error_code          String?        @db.VarChar(50)
+  error_message       String?
+  error_details       Json?
+  campaign_id         String?        @db.VarChar
+  created_at          DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?      @default(now()) @db.Timestamp(6)
+  media_id            String?        @db.VarChar
+  media_url           String?
+  media_mime_type     String?        @db.VarChar(100)
+  media_sha256        String?        @db.VarChar(128)
+  campaigns           campaigns?     @relation(fields: [campaign_id], references: [id], onUpdate: NoAction, map: "messages_campaign_id_campaigns_id_fk")
+  conversations       conversations? @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "messages_conversation_id_conversations_id_fk")
+
+  @@index([conversation_id], map: "messages_conversation_idx")
+  @@index([created_at], map: "messages_created_idx")
+  @@index([direction])
+  @@index([status])
+  @@index([timestamp])
+  @@index([whatsapp_message_id], map: "messages_whatsapp_idx")
+}
+
+model panel_config {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  name                String    @db.VarChar
+  tagline             String?   @db.VarChar
+  description         String?
+  logo                String?   @db.VarChar
+  favicon             String?   @db.VarChar
+  default_language    String?   @default("en") @db.VarChar(5)
+  supported_languages Json?     @default("[\"en\"]")
+  company_name        String?   @db.VarChar
+  company_website     String?   @db.VarChar
+  support_email       String?   @db.VarChar
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+}
+
+model templates {
+  id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id           String?     @db.VarChar
+  name                 String
+  category             String
+  language             String?     @default("en_US")
+  header               String?
+  body                 String
+  footer               String?
+  buttons              Json?       @default("[]")
+  variables            Json?       @default("[]")
+  status               String?     @default("draft")
+  rejection_reason     String?
+  media_type           String?     @default("text")
+  media_url            String?
+  media_handle         String?
+  carousel_cards       Json?       @default("[]")
+  whatsapp_template_id String?
+  usage_count          Int?        @default(0)
+  created_at           DateTime?   @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?   @default(now()) @db.Timestamp(6)
+  campaigns            campaigns[]
+  channels             channels?   @relation(fields: [channel_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "templates_channel_id_channels_id_fk")
+}
+
+model user_activity_logs {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  user_id     String    @db.VarChar
+  action      String
+  entity_type String?
+  entity_id   String?   @db.VarChar
+  details     Json?     @default("{}")
+  ip_address  String?
+  user_agent  String?
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  users       users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_activity_logs_user_id_users_id_fk")
+}
+
+model users {
+  id                                                                   String                     @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  username                                                             String                     @unique(map: "users_username_unique")
+  password                                                             String
+  email                                                                String                     @unique(map: "users_email_unique")
+  first_name                                                           String?
+  last_name                                                            String?
+  role                                                                 String                     @default("admin")
+  avatar                                                               String?
+  status                                                               String                     @default("active")
+  permissions                                                          String[]
+  last_login                                                           DateTime?                  @db.Timestamp(6)
+  created_at                                                           DateTime?                  @default(now()) @db.Timestamp(6)
+  updated_at                                                           DateTime?                  @default(now()) @db.Timestamp(6)
+  automations                                                          automations[]
+  conversation_assignments_conversation_assignments_assigned_byTousers conversation_assignments[] @relation("conversation_assignments_assigned_byTousers")
+  conversation_assignments_conversation_assignments_user_idTousers     conversation_assignments[] @relation("conversation_assignments_user_idTousers")
+  user_activity_logs                                                   user_activity_logs[]
+}
+
+model webhook_configs {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  channel_id   String?   @db.VarChar
+  webhook_url  String
+  verify_token String    @db.VarChar(100)
+  app_secret   String?
+  events       Json      @default("[]")
+  is_active    Boolean?  @default(true)
+  last_ping_at DateTime? @db.Timestamp(6)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model whatsapp_channels {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  name                String
+  phone_number        String          @unique(map: "whatsapp_channels_phone_number_unique") @db.VarChar(20)
+  phone_number_id     String          @db.VarChar(50)
+  waba_id             String          @db.VarChar(50)
+  access_token        String
+  business_account_id String?         @db.VarChar(50)
+  rate_limit_tier     String?         @default("standard") @db.VarChar(20)
+  quality_rating      String?         @default("green") @db.VarChar(20)
+  status              String?         @default("inactive") @db.VarChar(20)
+  error_message       String?
+  last_health_check   DateTime?       @db.Timestamp(6)
+  message_limit       Int?
+  messages_used       Int?
+  created_at          DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?       @default(now()) @db.Timestamp(6)
+  message_queue       message_queue[]
+}
