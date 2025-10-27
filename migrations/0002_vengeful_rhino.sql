@@ -1,0 +1,1 @@
+ALTER TABLE "conversation_assignments" ADD CONSTRAINT "conversation_assignments_assigned_by_users_id_fk" FOREIGN KEY ("assigned_by") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
