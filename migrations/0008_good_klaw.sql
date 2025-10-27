@@ -1,0 +1,1 @@
+ALTER TABLE "automation_nodes" ADD CONSTRAINT "automation_nodes_node_id_unique" UNIQUE("node_id");
